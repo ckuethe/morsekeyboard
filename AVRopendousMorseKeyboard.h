@@ -1,7 +1,7 @@
 /*
              MyUSB Library
      Copyright (C) Dean Camera, 2008.
-              
+
   dean [at] fourwalledcubicle [dot] com
       www.fourwalledcubicle.com
 */
@@ -62,7 +62,7 @@
 			uint8_t Reserved;
 			uint8_t KeyCode;
 		} USB_KeyboardReport_Data_t;
-			
+
 	/* Event Handlers: */
 		HANDLES_EVENT(USB_Connect);
 		HANDLES_EVENT(USB_Reset);
@@ -70,5 +70,5 @@
 		HANDLES_EVENT(USB_ConfigurationChanged);
 		HANDLES_EVENT(USB_UnhandledControlPacket);
 		HANDLES_EVENT(USB_UnhandledControlPacket);
-		
+
 #endif
