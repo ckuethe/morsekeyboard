@@ -55,8 +55,22 @@
 	                    USBIF HID Usage Tables
 	Usable Speeds:      Low Speed Mode, Full Speed Mode
 */
+#define DEBUG
 
+
+
+
+#ifdef DEBUG
+#include "log.h"
+#define puts(...) USB_puts(__VA_ARGS__)
+
+
+#else
 #include "AVRopendousMorseKeyboard.h"
+#define puts(...)
+
+#endif
+
 
 /* Project Tags, for reading out using the ButtLoad project */
 BUTTLOADTAG(ProjName,     "AVRopendous Morse Keyboard");
@@ -211,75 +225,43 @@ ISR(ENDPOINT_PIPE_vect)
 	/* Check if keyboard endpoint has interrupted */
 	if (Endpoint_HasEndpointInterrupted(KEYBOARD_EPNUM))
 	{
-		KeyboardReportData.KeyCode = 0x00;
 
+
+		if (go) {
+			KeyboardReportData.KeyCode = buf[buf_i].KeyCode;
+			KeyboardReportData.Modifier = buf[buf_i].Modifier;
+			if (buf[buf_i].KeyCode == 0) {
+				go = 0;
+			}
+			buf_i = (buf_i + 1) % MAXBUF;
+		} else {
+			buf_i = 0;
 
 
 		/* TODO: process pulse lengths into characters */
 
-		if (havePulse) { // only run this if we have a full pulse
-			// if Timer1 has overflowed, make sure to do the right subtraction
-			if (timer1Val2 > timer1Val1) {
-				timer1pulselength = timer1Val2 - timer1Val1;
-			} else {
-				timer1pulselength = timer1Val1 - timer1Val2;
-			}
+			if (havePulse) { // only run this if we have a full pulse
 
-			if (timer1pulselength > 3000) {
-				KeyboardReportData.KeyCode =  0x04; //a
-			} else {
-				KeyboardReportData.KeyCode =  0x05; //b
-			}
+				// if Timer1 has overflowed, make sure to do the right subtraction
+				if (timer1Val2 > timer1Val1) {
+					timer1pulselength = timer1Val2 - timer1Val1;
+				} else {
+					timer1pulselength = timer1Val1 - timer1Val2;
+				}
+				char s[50];
+				sprintf(s, "%d;", timer1pulselength); // is that bad?
+				puts(s);
+				if (timer1pulselength > 3000) {
+					KeyboardReportData.KeyCode =  0x04; //a
+				} else {
+					KeyboardReportData.KeyCode =  0x05; //b
+				}
 
-			havePulse = 0;
+				havePulse = 0;
+			}
 		}
 
-		/*
-		if (~PIND & (1 << PIND0))
-			KeyboardReportData.KeyCode = 0x04; //a
-		else if (~PIND & (1 << PIND1))
-			KeyboardReportData.KeyCode = 0x05; //b
-		else if (~PIND & (1 << PIND2))
-			KeyboardReportData.KeyCode = 0x06; //c
-		else if (~PIND & (1 << PIND3))
-			KeyboardReportData.KeyCode = 0x07; //d
-		else if (~PIND & (1 << PIND4))
-			KeyboardReportData.KeyCode = 0x08; //e
-		else if (~PIND & (1 << PIND5))
-			KeyboardReportData.KeyCode = 0x09; //f
-		else if (~PIND & (1 << PIND6))
-			KeyboardReportData.KeyCode = 0x0A; //g
-		else if (~PIND & (1 << PIND7))
-			KeyboardReportData.KeyCode = 0x0B; //h
 
-		else if (~PINB & (1 << PINB0))
-			KeyboardReportData.KeyCode = 0x0C; //i
-		else if (~PINB & (1 << PINB1))
-			KeyboardReportData.KeyCode = 0x0D; //j
-		else if (~PINB & (1 << PINB2))
-			KeyboardReportData.KeyCode = 0x0E; //k
-		else if (~PINB & (1 << PINB3))
-			KeyboardReportData.KeyCode = 0x0F; //l
-		else if (~PINB & (1 << PINB4))
-			KeyboardReportData.KeyCode = 0x10; //m
-		else if (~PINB & (1 << PINB5))
-			KeyboardReportData.KeyCode = 0x11; //n
-		else if (~PINB & (1 << PINB6))
-			KeyboardReportData.KeyCode = 0x12; //o
-		else if (~PINB & (1 << PINB7))
-			KeyboardReportData.KeyCode = 0x13; //p
-
-		else if (~PINC & (1 << PINC2))
-			KeyboardReportData.KeyCode = 0x18; //u
-		else if (~PINC & (1 << PINC4))
-			KeyboardReportData.KeyCode = 0x17; //t
-		else if (~PINC & (1 << PINC5))
-			KeyboardReportData.KeyCode = 0x16; //s
-		else if (~PINC & (1 << PINC6))
-			KeyboardReportData.KeyCode = 0x15; //r
-		else if (~PINC & (1 << PINC7))
-			KeyboardReportData.KeyCode = 0x14; //q
-		*/
 
 		/* Clear the Keyboard Report endpoint interrupt and select the endpoint */
 		Endpoint_ClearEndpointInterrupt(KEYBOARD_EPNUM);
