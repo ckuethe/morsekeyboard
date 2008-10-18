@@ -33,8 +33,16 @@ void USB_puts(char msg[]) {
 			buf[i+1].Modifier = 0;
 			break;
 		}
+		else if (msg[i] == 0) {
+			buf[i].KeyCode = 40; //return
+			buf[i+1].KeyCode = 0;
+			buf[i+1].Modifier = 0;
+			break;
+
+		}
 		i = i + 1;
 	}
 	go = 1;
 
 }
+

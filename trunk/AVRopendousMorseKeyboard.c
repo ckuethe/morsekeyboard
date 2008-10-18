@@ -71,7 +71,7 @@
 
 #endif
 
-
+#include <stdlib.h>
 /* Project Tags, for reading out using the ButtLoad project */
 BUTTLOADTAG(ProjName,     "AVRopendous Morse Keyboard");
 BUTTLOADTAG(BuildTime,    __TIME__);
@@ -228,12 +228,14 @@ ISR(ENDPOINT_PIPE_vect)
 
 
 		if (go) {
-			KeyboardReportData.KeyCode = buf[buf_i].KeyCode;
-			KeyboardReportData.Modifier = buf[buf_i].Modifier;
 			if (buf[buf_i].KeyCode == 0) {
-				go = 0;
+							go = 0;
+			} else {
+				KeyboardReportData.KeyCode = buf[buf_i].KeyCode;
+				KeyboardReportData.Modifier = buf[buf_i].Modifier;
+
+				buf_i = (buf_i + 1) % MAXBUF;
 			}
-			buf_i = (buf_i + 1) % MAXBUF;
 		} else {
 			buf_i = 0;
 
@@ -249,7 +251,8 @@ ISR(ENDPOINT_PIPE_vect)
 					timer1pulselength = timer1Val1 - timer1Val2;
 				}
 				char s[50];
-				sprintf(s, "%d;", timer1pulselength); // is that bad?
+				utoa(timer1pulselength, s, 10);
+				//sprintf(s, "%ud;", timer1pulselength); // is that bad?
 				puts(s);
 				if (timer1pulselength > 3000) {
 					KeyboardReportData.KeyCode =  0x04; //a
@@ -260,6 +263,7 @@ ISR(ENDPOINT_PIPE_vect)
 				havePulse = 0;
 			}
 		}
+
 
 
 
