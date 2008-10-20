@@ -55,21 +55,8 @@
 	                    USBIF HID Usage Tables
 	Usable Speeds:      Low Speed Mode, Full Speed Mode
 */
-#define DEBUG
 
-
-
-
-#ifdef DEBUG
-#include "log.h"
-#define puts(...) USB_puts(__VA_ARGS__)
-
-
-#else
 #include "AVRopendousMorseKeyboard.h"
-#define puts(...)
-
-#endif
 
 #include <stdlib.h>
 /* Project Tags, for reading out using the ButtLoad project */
@@ -226,18 +213,9 @@ ISR(ENDPOINT_PIPE_vect)
 	if (Endpoint_HasEndpointInterrupted(KEYBOARD_EPNUM))
 	{
 
+		KeyboardReportData.Modifier = 0;
+		KeyboardReportData.KeyCode[0]  = 0;
 
-		if (go) {
-			if (buf[buf_i].KeyCode == 0) {
-							go = 0;
-			} else {
-				KeyboardReportData.KeyCode = buf[buf_i].KeyCode;
-				KeyboardReportData.Modifier = buf[buf_i].Modifier;
-
-				buf_i = (buf_i + 1) % MAXBUF;
-			}
-		} else {
-			buf_i = 0;
 
 
 		/* TODO: process pulse lengths into characters */
@@ -252,17 +230,16 @@ ISR(ENDPOINT_PIPE_vect)
 				}
 				char s[50];
 				utoa(timer1pulselength, s, 10);
-				//sprintf(s, "%ud;", timer1pulselength); // is that bad?
 				puts(s);
 				if (timer1pulselength > 3000) {
-					KeyboardReportData.KeyCode =  0x04; //a
+					KeyboardReportData.KeyCode[0] =  0x04; //a
 				} else {
-					KeyboardReportData.KeyCode =  0x05; //b
+					KeyboardReportData.KeyCode[0] =  0x05; //b
 				}
 
 				havePulse = 0;
 			}
-		}
+
 
 
 
@@ -279,7 +256,7 @@ ISR(ENDPOINT_PIPE_vect)
 
 		/* Clear the report data afterwards */
 		KeyboardReportData.Modifier = 0;
-		KeyboardReportData.KeyCode  = 0;
+		KeyboardReportData.KeyCode[0]  = 0;
 
 		/* Clear the endpoint IN interrupt flag */
 		USB_INT_Clear(ENDPOINT_INT_IN);

@@ -92,7 +92,6 @@ OBJDIR = .
 # List C source files here. (C dependencies are automatically generated.)
 SRC = $(TARGET).c                                           \
 	  Descriptors.c                                         \
-	  log.c \
 	  ../../MyUSB/Drivers/USB/LowLevel/LowLevel.c           \
 	  ../../MyUSB/Drivers/USB/LowLevel/Endpoint.c           \
 	  ../../MyUSB/Drivers/USB/LowLevel/DevChapter9.c        \
