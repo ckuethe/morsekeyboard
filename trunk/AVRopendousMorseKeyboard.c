@@ -77,6 +77,18 @@ uint16_t timer1Val2 = 0;
 uint16_t timer1pulselength = 0;
 
 
+uint8_t atousba(char ch) {
+	uint8_t res = 0;
+	if (((uint8_t)ch <= 122) && ((uint8_t)ch >= 97)) // a- z
+		res = (uint8_t)ch - 93;
+	else if (((uint8_t)ch <= 90) && ((uint8_t)ch >= 65)) { // A -Z
+		res = (uint8_t)ch - 61;
+	}
+	else if (((uint8_t)ch <= 57) && ((uint8_t)ch >= 49)) // 1 - 9
+		res = (uint8_t)ch - 19;
+	return res;
+}
+
 int main(void)
 {
 	/* Disable watchdog if enabled by bootloader/fuses */
@@ -214,7 +226,8 @@ ISR(ENDPOINT_PIPE_vect)
 	{
 
 		KeyboardReportData.Modifier = 0;
-		KeyboardReportData.KeyCode[0]  = 0;
+		for (int i=0; i<6; i++)
+			KeyboardReportData.KeyCode[i]  = 0;
 
 
 
@@ -228,11 +241,15 @@ ISR(ENDPOINT_PIPE_vect)
 				} else {
 					timer1pulselength = timer1Val1 - timer1Val2;
 				}
-				char s[50];
-				utoa(timer1pulselength, s, 10);
-				puts(s);
+				char s[6];
+				itoa(timer1pulselength, s, 16);
+				for (int i=0; i<4; i++) {
+					KeyboardReportData.KeyCode[i+1] = atousba(s[i]);
+				}
 				if (timer1pulselength > 3000) {
 					KeyboardReportData.KeyCode[0] =  0x04; //a
+
+
 				} else {
 					KeyboardReportData.KeyCode[0] =  0x05; //b
 				}
@@ -256,7 +273,9 @@ ISR(ENDPOINT_PIPE_vect)
 
 		/* Clear the report data afterwards */
 		KeyboardReportData.Modifier = 0;
-		KeyboardReportData.KeyCode[0]  = 0;
+		for (int i=0; i<6; i++)
+			KeyboardReportData.KeyCode[i]  = 0;
+
 
 		/* Clear the endpoint IN interrupt flag */
 		USB_INT_Clear(ENDPOINT_INT_IN);
