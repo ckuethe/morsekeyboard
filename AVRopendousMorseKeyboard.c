@@ -66,7 +66,7 @@ BUTTLOADTAG(BuildDate,    __DATE__);
 BUTTLOADTAG(MyUSBVersion, "MyUSB V" MYUSB_VERSION_STRING);
 
 /* Global Variables */
-USB_KeyboardReport_Data_t KeyboardReportData = {Modifier: 0, KeyCode: 0};
+USB_KeyboardReport_Data_t KeyboardReportData;
 uint8_t temp = 0;
 uint16_t timer1Value = 0;
 uint16_t timer1OverflowCount = 0;
