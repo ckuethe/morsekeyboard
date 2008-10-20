@@ -38,6 +38,10 @@
 #ifndef _AVROPENDOUS_MORSE_KEYBOARD_H_
 #define _AVROPENDOUS_MORSE_KEYBOARD_H_
 
+
+
+
+
 	/* Includes: */
 		#include <avr/io.h>
 		#include <avr/wdt.h>
@@ -60,7 +64,7 @@
 		{
 			uint8_t Modifier;
 			uint8_t Reserved;
-			uint8_t KeyCode;
+			uint8_t KeyCode[5];
 		} USB_KeyboardReport_Data_t;
 
 	/* Event Handlers: */
