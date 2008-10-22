@@ -64,8 +64,10 @@
 		{
 			uint8_t Modifier;
 			uint8_t Reserved;
-			uint8_t KeyCode[6];  // won't work when greater than 1
+			uint8_t KeyCode[6];
 		} USB_KeyboardReport_Data_t;
+
+
 
 	/* Event Handlers: */
 		HANDLES_EVENT(USB_Connect);

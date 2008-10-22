@@ -67,7 +67,9 @@ BUTTLOADTAG(MyUSBVersion, "MyUSB V" MYUSB_VERSION_STRING);
 
 /* Global Variables */
 USB_KeyboardReport_Data_t KeyboardReportData;
+
 uint8_t temp = 0;
+uint16_t counter = 0;
 uint16_t timer1Value = 0;
 uint16_t timer1OverflowCount = 0;
 uint8_t firstEdge = 1;
@@ -77,17 +79,66 @@ uint16_t timer1Val2 = 0;
 uint16_t timer1pulselength = 0;
 
 
-uint8_t atousba(char ch) {
-	uint8_t res = 0;
-	if (((uint8_t)ch <= 122) && ((uint8_t)ch >= 97)) // a- z
-		res = (uint8_t)ch - 93;
-	else if (((uint8_t)ch <= 90) && ((uint8_t)ch >= 65)) { // A -Z
-		res = (uint8_t)ch - 61;
-	}
-	else if (((uint8_t)ch <= 57) && ((uint8_t)ch >= 49)) // 1 - 9
-		res = (uint8_t)ch - 19;
+uint8_t itokeycode(uint8_t i) {
+	uint8_t res = 28; // y
+	switch (i)
+		{
+			case 10:
+				res = 0x04; // a
+				break;
+			case 11:
+				res = 0x05;
+				break;
+			case 12:
+				res = 0x06;
+				break;
+			case 13:
+				res = 0x07;
+				break;
+			case 14:
+				res = 0x08;
+				break;
+			case 15:
+				res = 0x09;
+				break;
+			case 0:
+				res = 39; //0
+				break;
+			case 1:
+				res = 30;
+				break;
+			case 2:
+				res = 31;
+				break;
+			case 3:
+				res = 32;
+				break;
+			case 4:
+				res = 33;
+				break;
+			case 5:
+				res = 34;
+				break;
+			case 6:
+				res = 35;
+				break;
+			case 7:
+				res = 36;
+				break;
+			case 8:
+				res = 37;
+				break;
+			case 9:
+				res = 38;
+				break;
+			default:
+				res = 27; //x
+				break;
+		}
 	return res;
 }
+
+
 
 int main(void)
 {
@@ -224,11 +275,10 @@ ISR(ENDPOINT_PIPE_vect)
 	/* Check if keyboard endpoint has interrupted */
 	if (Endpoint_HasEndpointInterrupted(KEYBOARD_EPNUM))
 	{
-
 		KeyboardReportData.Modifier = 0;
-		for (int i=0; i<6; i++)
+		for (int i=0; i<6; i++) {
 			KeyboardReportData.KeyCode[i]  = 0;
-
+		}
 
 
 		/* TODO: process pulse lengths into characters */
@@ -241,20 +291,19 @@ ISR(ENDPOINT_PIPE_vect)
 				} else {
 					timer1pulselength = timer1Val1 - timer1Val2;
 				}
-				char s[6];
-				itoa(timer1pulselength, s, 16);
-				for (int i=0; i<4; i++) {
-					KeyboardReportData.KeyCode[i+1] = atousba(s[i]);
-				}
+
+				counter += 1;
 				if (timer1pulselength > 3000) {
-					KeyboardReportData.KeyCode[0] =  0x04; //a
+					KeyboardReportData.KeyCode[0] =  27; //x
+					KeyboardReportData.KeyCode[1] =  27; //x
+					KeyboardReportData.KeyCode[2] =  27; //x
+					KeyboardReportData.KeyCode[3] =  27; //x
 
 
 				} else {
-					KeyboardReportData.KeyCode[0] =  0x05; //b
+					KeyboardReportData.KeyCode[0] =  28; //y
 				}
 
-				havePulse = 0;
 			}
 
 
@@ -273,9 +322,9 @@ ISR(ENDPOINT_PIPE_vect)
 
 		/* Clear the report data afterwards */
 		KeyboardReportData.Modifier = 0;
-		for (int i=0; i<6; i++)
+		for (int i=0; i<6; i++) {
 			KeyboardReportData.KeyCode[i]  = 0;
-
+		}
 
 		/* Clear the endpoint IN interrupt flag */
 		USB_INT_Clear(ENDPOINT_INT_IN);
