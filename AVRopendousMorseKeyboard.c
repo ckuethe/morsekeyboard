@@ -69,7 +69,6 @@ BUTTLOADTAG(MyUSBVersion, "MyUSB V" MYUSB_VERSION_STRING);
 USB_KeyboardReport_Data_t KeyboardReportData;
 
 uint8_t temp = 0;
-uint16_t counter = 0;
 uint16_t timer1Value = 0;
 uint16_t timer1OverflowCount = 0;
 uint8_t firstEdge = 1;
@@ -292,7 +291,6 @@ ISR(ENDPOINT_PIPE_vect)
 					timer1pulselength = timer1Val1 - timer1Val2;
 				}
 
-				counter += 1;
 				if (timer1pulselength > 3000) {
 					KeyboardReportData.KeyCode[0] =  27; //x
 					KeyboardReportData.KeyCode[1] =  27; //x
@@ -302,7 +300,12 @@ ISR(ENDPOINT_PIPE_vect)
 
 				} else {
 					KeyboardReportData.KeyCode[0] =  28; //y
+					KeyboardReportData.KeyCode[1] =  28; //y
+					KeyboardReportData.KeyCode[2] =  28; //y
+					KeyboardReportData.KeyCode[3] =  28; //y
+
 				}
+				havePulse = 0;
 
 			}
 
