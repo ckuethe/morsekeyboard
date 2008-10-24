@@ -292,10 +292,10 @@ ISR(ENDPOINT_PIPE_vect)
 				}
 
 				if (timer1pulselength > 3000) {
-					KeyboardReportData.KeyCode[0] =  27; //x
-					KeyboardReportData.KeyCode[1] =  27; //x
-					KeyboardReportData.KeyCode[2] =  27; //x
-					KeyboardReportData.KeyCode[3] =  27; //x
+					KeyboardReportData.KeyCode[0] =  26; //
+					KeyboardReportData.KeyCode[1] =  27; //
+					KeyboardReportData.KeyCode[2] =  28; //
+					KeyboardReportData.KeyCode[3] =  29; //
 
 
 				} else {
