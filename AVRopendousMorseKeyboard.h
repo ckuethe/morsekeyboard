@@ -1,7 +1,7 @@
 /*
              MyUSB Library
      Copyright (C) Dean Camera, 2008.
-
+              
   dean [at] fourwalledcubicle [dot] com
       www.fourwalledcubicle.com
 */
@@ -35,29 +35,29 @@
 	written by Dean Camera.
 */
 
-#ifndef _AVROPENDOUS_MORSE_KEYBOARD_H_
-#define _AVROPENDOUS_MORSE_KEYBOARD_H_
-
-
-
-
+#ifndef _AVROPENDOUSMORSEKEYBOARD_H_
+#define _AVROPENDOUSMORSEKEYBOARD_H_
 
 	/* Includes: */
 		#include <avr/io.h>
 		#include <avr/wdt.h>
+		#include <avr/interrupt.h>
+		#include <stdbool.h>
+		#include <string.h>
 
 		#include "Descriptors.h"
 
-		#include <MyUSB/Version.h>                    // Library Version Information
-		#include <MyUSB/Common/ButtLoadTag.h>         // PROGMEM tags readable by the ButtLoad project
-		#include <MyUSB/Drivers/USB/USB.h>            // USB Functionality
+		#include <libs/MyUSB/Version.h>			// Library Version Information
+		#include <libs/MyUSB/Common/ButtLoadTag.h>	// PROGMEM tags readable by the ButtLoad project
+		#include <libs/MyUSB/Drivers/USB/USB.h>		// USB Functionality
 
 	/* Macros: */
-		#define REQ_GetReport   0x01
-
-	/* Globals */
-	extern uint16_t timer1Value;
-	extern uint16_t timer1OverflowCount;
+		#define REQ_GetReport      0x01
+		#define REQ_GetIdle        0x02
+		#define REQ_SetReport      0x09
+		#define REQ_SetIdle        0x0A
+		#define REQ_GetProtocol    0x03
+		#define REQ_SetProtocol    0x0B
 
 	/* Type Defines: */
 		typedef struct
@@ -67,14 +67,14 @@
 			uint8_t KeyCode[6];
 		} USB_KeyboardReport_Data_t;
 
-
-
 	/* Event Handlers: */
 		HANDLES_EVENT(USB_Connect);
-		HANDLES_EVENT(USB_Reset);
 		HANDLES_EVENT(USB_Disconnect);
 		HANDLES_EVENT(USB_ConfigurationChanged);
 		HANDLES_EVENT(USB_UnhandledControlPacket);
-		HANDLES_EVENT(USB_UnhandledControlPacket);
+
+	/* Function Prototypes: */
+		bool GetNextReport(USB_KeyboardReport_Data_t* ReportData);
+		void ProcessLEDReport(uint8_t LEDReport);
 
 #endif

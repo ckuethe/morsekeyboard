@@ -1,6 +1,6 @@
 # Hey Emacs, this is a -*- makefile -*-
 #----------------------------------------------------------------------------
-# WinAVR Makefile Template written by Eric B. Weddington, Jï¿½rg Wunsch, et al.
+# WinAVR Makefile Template written by Eric B. Weddington, Jörg Wunsch, et al.
 #
 # Released to the Public Domain
 #
@@ -44,6 +44,7 @@
 # To rebuild project do "make clean" then "make all".
 #----------------------------------------------------------------------------
 
+
 # MCU name
 MCU = at90usb162
 
@@ -60,18 +61,8 @@ BOARD  = USER
 #     calculate timings. Do NOT tack on a 'UL' at the end, this will be done
 #     automatically to create a 32-bit value in your source code.
 #     Typical values are:
-#         F_CPU =  1000000
-#         F_CPU =  1843200
-#         F_CPU =  2000000
-#         F_CPU =  3686400
-#         F_CPU =  4000000
-#         F_CPU =  7372800
 #         F_CPU =  8000000
-#         F_CPU = 11059200
-#         F_CPU = 14745600
 #         F_CPU = 16000000
-#         F_CPU = 18432000
-#         F_CPU = 20000000
 F_CPU = 8000000
 
 
@@ -92,13 +83,14 @@ OBJDIR = .
 # List C source files here. (C dependencies are automatically generated.)
 SRC = $(TARGET).c                                           \
 	  Descriptors.c                                         \
-	  ../../MyUSB/Drivers/USB/LowLevel/LowLevel.c           \
-	  ../../MyUSB/Drivers/USB/LowLevel/Endpoint.c           \
-	  ../../MyUSB/Drivers/USB/LowLevel/DevChapter9.c        \
-	  ../../MyUSB/Drivers/USB/HighLevel/USBTask.c           \
-	  ../../MyUSB/Drivers/USB/HighLevel/USBInterrupt.c      \
-	  ../../MyUSB/Drivers/USB/HighLevel/Events.c            \
-	  ../../MyUSB/Drivers/USB/HighLevel/StdDescriptors.c    \
+	  RingBuff.c                                         \
+	  ../../libs/MyUSB/Drivers/USB/LowLevel/LowLevel.c           \
+	  ../../libs/MyUSB/Drivers/USB/LowLevel/Endpoint.c           \
+	  ../../libs/MyUSB/Drivers/USB/LowLevel/DevChapter9.c        \
+	  ../../libs/MyUSB/Drivers/USB/HighLevel/USBTask.c           \
+	  ../../libs/MyUSB/Drivers/USB/HighLevel/USBInterrupt.c      \
+	  ../../libs/MyUSB/Drivers/USB/HighLevel/Events.c            \
+	  ../../libs/MyUSB/Drivers/USB/HighLevel/StdDescriptors.c    \
 	  
 # List C++ source files here. (C dependencies are automatically generated.)
 CPPSRC = 
@@ -131,7 +123,7 @@ DEBUG = dwarf-2
 #     Each directory must be seperated by a space.
 #     Use forward slashes for directory separators.
 #     For a directory that has spaces, enclose it in quotes.
-EXTRAINCDIRS = ../../
+EXTRAINCDIRS = ../../ ../../libs/
 
 
 # Compiler flag to set the C Standard level.
@@ -143,7 +135,7 @@ CSTANDARD = -std=gnu99
 
 
 # Place -D or -U options here for C sources
-CDEFS  = -DF_CPU=$(F_CPU)UL -DBOARD=BOARD_$(BOARD) -DUSE_NONSTANDARD_DESCRIPTOR_NAMES
+CDEFS  = -DF_CPU=$(F_CPU)UL -DBOARD=BOARD_$(BOARD) -DUSE_NONSTANDARD_DESCRIPTOR_NAMES -DNO_STREAM_CALLBACKS
 CDEFS += -DUSB_DEVICE_ONLY -DUSE_STATIC_OPTIONS="(USB_DEVICE_OPT_FULLSPEED | USB_OPT_REG_ENABLED)"
 
 
@@ -256,7 +248,7 @@ MATH_LIB = -lm
 #     Each directory must be seperated by a space.
 #     Use forward slashes for directory separators.
 #     For a directory that has spaces, enclose it in quotes.
-EXTRALIBDIRS = 
+EXTRALIBDIRS = ../../libs/
 
 
 
@@ -491,8 +483,9 @@ flip: $(TARGET).hex
 
 
 dfu: $(TARGET).hex
-	dfu-programmer $(MCU) erase --debug 100
-	dfu-programmer $(MCU) flash --debug 100 $(TARGET).hex
+	dfu-programmer $(MCU) erase --debug 255
+	dfu-programmer $(MCU) flash --debug 255 $(TARGET).hex
+
 
 # Generate avr-gdb config/init file which does the following:
 #     define the reset signal, load the target file, connect to target, and set 

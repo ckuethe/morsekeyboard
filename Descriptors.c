@@ -1,7 +1,7 @@
 /*
              MyUSB Library
      Copyright (C) Dean Camera, 2008.
-
+              
   dean [at] fourwalledcubicle [dot] com
       www.fourwalledcubicle.com
 */
@@ -42,13 +42,13 @@ USB_Descriptor_HIDReport_Datatype_t KeyboardReport[] PROGMEM =
 	0x05, 0x01,          /* Usage Page (Generic Desktop)                    */
 	0x09, 0x06,          /* Usage (Keyboard)                                */
 	0xa1, 0x01,          /* Collection (Application)                        */
-	0x05, 0x07,          /*   Usage Page (Keyboard)                         */
+	0x75, 0x01,          /*   Report Size (1)                               */
+	0x95, 0x08,          /*   Report Count (8)                              */
+	0x05, 0x07,          /*   Usage Page (Key Codes)                        */
 	0x19, 0xe0,          /*   Usage Minimum (Keyboard LeftControl)          */
 	0x29, 0xe7,          /*   Usage Maximum (Keyboard Right GUI)            */
 	0x15, 0x00,          /*   Logical Minimum (0)                           */
 	0x25, 0x01,          /*   Logical Maximum (1)                           */
-	0x75, 0x01,          /*   Report Size (1)                               */
-	0x95, 0x08,          /*   Report Count (8)                              */
 	0x81, 0x02,          /*   Input (Data, Variable, Absolute)              */
 	0x95, 0x01,          /*   Report Count (1)                              */
 	0x75, 0x08,          /*   Report Size (8)                               */
@@ -76,25 +76,25 @@ USB_Descriptor_HIDReport_Datatype_t KeyboardReport[] PROGMEM =
 USB_Descriptor_Device_t DeviceDescriptor PROGMEM =
 {
 	Header:                 {Size: sizeof(USB_Descriptor_Device_t), Type: DTYPE_Device},
-
+		
 	USBSpecification:       VERSION_BCD(01.10),
 	Class:                  0x00,
-	SubClass:               0x00,
+	SubClass:               0x00,	
 	Protocol:               0x00,
-
+				
 	Endpoint0Size:          8,
-
+		
 	VendorID:               0x03EB,
 	ProductID:              0x2042,
 	ReleaseNumber:          0x0000,
-
+		
 	ManufacturerStrIndex:   0x01,
 	ProductStrIndex:        0x02,
-	SerialNumStrIndex:      0x03,
-
+	SerialNumStrIndex:      NO_DESCRIPTOR_STRING,
+		
 	NumberOfConfigurations: 1
 };
-
+	
 USB_Descriptor_Configuration_t ConfigurationDescriptor PROGMEM =
 {
 	Config:
@@ -103,42 +103,42 @@ USB_Descriptor_Configuration_t ConfigurationDescriptor PROGMEM =
 
 			TotalConfigurationSize: sizeof(USB_Descriptor_Configuration_t),
 			TotalInterfaces:        1,
-
+				
 			ConfigurationNumber:    1,
 			ConfigurationStrIndex:  NO_DESCRIPTOR_STRING,
-
+				
 			ConfigAttributes:       (USB_CONFIG_ATTR_BUSPOWERED | USB_CONFIG_ATTR_SELFPOWERED),
-
+			
 			MaxPowerConsumption:    USB_CONFIG_POWER_MA(100)
 		},
-
+		
 	Interface:
 		{
 			Header:                 {Size: sizeof(USB_Descriptor_Interface_t), Type: DTYPE_Interface},
 
 			InterfaceNumber:        0x00,
 			AlternateSetting:       0x00,
-
+			
 			TotalEndpoints:         2,
-
+				
 			Class:                  0x03,
-			SubClass:               0x00,
-			Protocol:               0x00,
-
+			SubClass:               0x01,
+			Protocol:               0x01,
+				
 			InterfaceStrIndex:      NO_DESCRIPTOR_STRING
 		},
 
 	KeyboardHID:
-		{
+		{  
 			Header:                 {Size: sizeof(USB_Descriptor_HID_t), Type: DTYPE_HID},
-
+			
 			HIDSpec:                VERSION_BCD(01.11),
 			CountryCode:            0x00,
 			TotalHIDReports:        0x01,
 			HIDReportType:          DTYPE_Report,
-			HIDReportLength:        sizeof(KeyboardReport)
+			HIDReportLength:        sizeof(KeyboardReport)  
 		},
-
+		
 	KeyboardEndpoint:
 		{
 			Header:                 {Size: sizeof(USB_Descriptor_Endpoint_t), Type: DTYPE_Endpoint},
@@ -163,29 +163,22 @@ USB_Descriptor_Configuration_t ConfigurationDescriptor PROGMEM =
 USB_Descriptor_String_t LanguageString PROGMEM =
 {
 	Header:                 {Size: USB_STRING_LEN(1), Type: DTYPE_String},
-
+		
 	UnicodeString:          {LANGUAGE_ID_ENG}
 };
 
 USB_Descriptor_String_t ManufacturerString PROGMEM =
 {
-	Header:                 {Size: USB_STRING_LEN(19), Type: DTYPE_String},
-
+	Header:                 {Size: USB_STRING_LEN(20), Type: DTYPE_String},
+		
 	UnicodeString:          L"www.AVRopendous.org"
 };
 
 USB_Descriptor_String_t ProductString PROGMEM =
 {
 	Header:                 {Size: USB_STRING_LEN(26), Type: DTYPE_String},
-
-	UnicodeString:          L"AVRopendous Morse Keyboard"
-};
-
-USB_Descriptor_String_t SerialNumberString PROGMEM =
-{
-	Header:                 {Size: USB_STRING_LEN(12), Type: DTYPE_String},
-
-	UnicodeString:          L"000000000000"
+		
+	UnicodeString:          L"AVRopendousMorseKeyboard"
 };
 
 bool USB_GetDescriptor(const uint16_t wValue, const uint8_t wIndex,
@@ -219,12 +212,8 @@ bool USB_GetDescriptor(const uint16_t wValue, const uint8_t wIndex,
 					Address = DESCRIPTOR_ADDRESS(ProductString);
 					Size    = pgm_read_byte(&ProductString.Header.Size);
 					break;
-				case 0x03:
-					Address = DESCRIPTOR_ADDRESS(SerialNumberString);
-					Size    = pgm_read_byte(&SerialNumberString.Header.Size);
-					break;
 			}
-
+			
 			break;
 		case DTYPE_HID:
 			Address = DESCRIPTOR_ADDRESS(ConfigurationDescriptor.KeyboardHID);
@@ -235,7 +224,7 @@ bool USB_GetDescriptor(const uint16_t wValue, const uint8_t wIndex,
 			Size    = sizeof(KeyboardReport);
 			break;
 	}
-
+	
 	if (Address != NULL)
 	{
 		*DescriptorAddress = Address;
@@ -243,6 +232,6 @@ bool USB_GetDescriptor(const uint16_t wValue, const uint8_t wIndex,
 
 		return true;
 	}
-
+		
 	return false;
 }
