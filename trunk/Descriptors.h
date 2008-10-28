@@ -39,7 +39,7 @@
 #define _DESCRIPTORS_H_
 
 	/* Includes: */
-		#include <MyUSB/Drivers/USB/USB.h>
+		#include <libs/MyUSB/Drivers/USB/USB.h>
 
 		#include <avr/pgmspace.h>
 
@@ -68,10 +68,6 @@
 	        USB_Descriptor_Endpoint_t             KeyboardLEDsEndpoint;
 		} USB_Descriptor_Configuration_t;
 
-	/* External Variables: */
-		extern USB_Descriptor_HIDReport_Datatype_t KeyboardReport[];
-		extern USB_Descriptor_Configuration_t      ConfigurationDescriptor;
-
 	/* Macros: */
 		#define KEYBOARD_EPNUM               1
 		#define KEYBOARD_LEDS_EPNUM          2
@@ -79,6 +75,10 @@
 
 		#define DTYPE_HID                    0x21
 		#define DTYPE_Report                 0x22
+
+	/* External Variables: */
+		extern USB_Descriptor_HIDReport_Datatype_t KeyboardReport[];
+		extern USB_Descriptor_Configuration_t      ConfigurationDescriptor;
 
 	/* Function Prototypes: */
 		bool USB_GetDescriptor(const uint16_t wValue, const uint8_t wIndex,
