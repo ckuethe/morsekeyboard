@@ -84,6 +84,12 @@ uint16_t timer1Val1 = 0;
 uint16_t timer1Val2 = 0;
 uint16_t timer1pulselength = 0;
 
+uint8_t prevch = 0;
+uint16_t timer2pulselength = 0;
+
+char string_1[] PROGMEM = "this is the magic string that shows how progmem works;";
+
+
 
 RingBuff_t print_buffer;
 RingBuff_t code_buffer;
@@ -309,87 +315,9 @@ ISR(TIMER0_COMPA_vect, ISR_BLOCK)
 	  IdleMSRemaining--;
 }
 
-uint8_t itokeycode(uint8_t i) {
-    uint8_t res = 28; // y
-    switch (i)
-    {
-        case 10:
-                res = 0x04; // a
-                break;
-        case 11:
-                res = 0x05;
-                break;
-        case 12:
-                res = 0x06;
-                break;
-        case 13:
-                res = 0x07;
-                break;
-        case 14:
-                res = 0x08;
-                break;
-        case 15:
-                res = 0x09;
-                break;
-        case 0:
-                res = 39; //0
-                break;
-        case 1:
-                res = 30;
-                break;
-        case 2:
-                res = 31;
-                break;
-        case 3:
-                res = 32;
-                break;
-        case 4:
-                res = 33;
-                break;
-        case 5:
-                res = 34;
-                break;
-        case 6:
-                res = 35;
-                break;
-        case 7:
-                res = 36;
-                break;
-        case 8:
-                res = 37;
-                break;
-        case 9:
-                res = 38;
-                break;
-        default:
-                res = 27; //x
-                break;
-    }
-    return res;
-}
-
-void USBputs_i(uint8_t i) 
-{
-    uint8_t u = (i & 0xf0) >> 4;
-    uint8_t l = (i & 0x0f);
-    if (u) 
-        Buffer_StoreElement(&print_buffer, (uint8_t)itokeycode(u));
-    Buffer_StoreElement(&print_buffer, (uint8_t)itokeycode(l));
-}
-
-void USBputs_i16(uint16_t i) 
-{
-    uint8_t u = (i & 0xff00) >> 8;     
-    uint8_t l = (i & 0x00ff);     
-    if (u) 
-        USBputs_i(u);
-    USBputs_i(l);
-}
-
 void USBputs(char msg[]) 
 {
     int i = 0;
-    uint8_t prevch = 0;
     while (msg[i] != 0) {
         if (prevch == (uint8_t)msg[i]) {
 			Buffer_StoreElement(&print_buffer, (uint8_t)0);
@@ -408,12 +336,97 @@ void USBputs(char msg[])
 			Buffer_StoreElement(&print_buffer, (uint8_t)39);
 		else if ((uint8_t)msg[i] == 32)
 			Buffer_StoreElement(&print_buffer, (uint8_t)44); //space
+		else if ((uint8_t)msg[i] == 59)
+			Buffer_StoreElement(&print_buffer, (uint8_t)40); //enter
         prevch = (uint8_t)msg[i];
         i++;
 
 
     }
 }
+
+char itohexa(uint8_t i) {
+    char res; // y
+    switch (i)
+    {
+        case 10:
+                res = 'A'; // a
+                break;
+        case 11:
+                res = 'B';
+                break;
+        case 12:
+                res = 'C';
+                break;
+        case 13:
+                res = 'D';
+                break;
+        case 14:
+                res = 'E';
+                break;
+        case 15:
+                res = 'F';
+                break;
+        case 0:
+                res = '0'; //0
+                break;
+        case 1:
+                res = '1';
+                break;
+        case 2:
+                res = '2';
+                break;
+        case 3:
+                res = '3';
+                break;
+        case 4:
+                res = '4';
+                break;
+        case 5:
+                res = '5';
+                break;
+        case 6:
+                res = '6';
+                break;
+        case 7:
+                res = '7';
+                break;
+        case 8:
+                res = '8';
+                break;
+        case 9:
+                res = '9';
+                break;
+        default:
+                res = 'x'; //x
+                break;
+    }
+    return res;
+}
+
+void USBputs_i(uint8_t i) 
+{
+    uint8_t u = (i & 0xf0) >> 4;
+    uint8_t l = (i & 0x0f);
+    char su[2];
+    su[0] = itohexa(u);
+    su[1] = 0; 
+    char sl[2];
+    sl[0] = itohexa(l);
+    sl[1] = 0; 
+    USBputs(su);
+    USBputs(sl);
+}
+
+void USBputs_i16(uint16_t i) 
+{
+    uint8_t u = (i & 0xff00) >> 8;     
+    uint8_t l = (i & 0x00ff); 
+    USBputs_i(u);
+    USBputs_i(l);
+}
+
+
 
 bool GetNextReport(USB_KeyboardReport_Data_t* ReportData)
 {
@@ -431,7 +444,7 @@ bool GetNextReport(USB_KeyboardReport_Data_t* ReportData)
         /* TODO: process pulse lengths into characters */
         if (havePulse) { // only run this if we have a full pulse
             // if Timer1 has overflowed, make sure to do the right subtraction
-            if (timer1Val2 > timer1Val1) {
+            if (timer1Val2 > timer1Val1) { // Why is this here?  Can't you just check timer1pulselength
                 timer1pulselength = timer1Val2 - timer1Val1;
             } else {
                 timer1pulselength = timer1Val1 - timer1Val2;
@@ -439,8 +452,22 @@ bool GetNextReport(USB_KeyboardReport_Data_t* ReportData)
 
             if (timer1pulselength > 3000) {
                 ReportData->KeyCode[0] =  0x04; //a
+                USBputs(";");
+                USBputs_i16(timer1pulselength);
+                USBputs(";");
+                USBputs_i16(timer2pulselength);
+                USBputs(";");
+                USBputs_i16(timer1OverflowCount);
+                USBputs(";");
             } else {
                 ReportData->KeyCode[0] =  0x05; //b
+                USBputs(";");
+                USBputs_i16(timer1pulselength);
+                USBputs(";");
+                USBputs_i16(timer2pulselength);
+                USBputs(";");
+                USBputs_i16(timer1OverflowCount);
+                USBputs(";");
             }
 
             havePulse = 0;
@@ -454,8 +481,8 @@ bool GetNextReport(USB_KeyboardReport_Data_t* ReportData)
             Buffer_StoreElement(&print_buffer, 0x1F); 
             Buffer_StoreElement(&print_buffer, 0x20); 
         } else if (~PIND & (1 << PIND1)) {
-            USBputs("aaaaa this is it aaaaa pin --> ");
-            USBputs_i(0x14);
+            
+            ReportData->KeyCode[0] = 0x05; //b
         } else if (~PIND & (1 << PIND2)) {
             ReportData->KeyCode[0] = 0x06; //c
         } else if (~PIND & (1 << PIND3)) {
@@ -513,10 +540,17 @@ ISR(INT7_vect)
 	timer1Value = TCNT1;
 
 	// note that since HWB is pulled up, we need only worry about how long a LOW level lasts
-	if (~PIND & (1 << PIND7)) { // LOW level edge - falling edge
+	if (~PIND & (1 << PIND7)) { // LOW level edge - falling edge - KEYDOWN
+        // also time the in between values
 		timer1Val1 = timer1Value;
 		firstEdge = 0;
-	} else if (PIND & (1 << PIND7)) { // HIGH level edge - rising edge
+
+		if (timer1Val2 > timer1Val1) {
+			timer2pulselength = timer1Val2 - timer1Val1;
+		} else {
+			timer2pulselength = timer1Val1 - timer1Val2;
+		}
+	} else if (PIND & (1 << PIND7)) { // HIGH level edge - rising edge - KEYUP
 		timer1Val2 = timer1Value;
 
 		// debounce key press (i.e, discard it if it is too short)

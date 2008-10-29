@@ -42,6 +42,7 @@
 		#include <avr/io.h>
 		#include <avr/wdt.h>
 		#include <avr/interrupt.h>
+        #include <avr/pgmspace.h>
 		#include <stdbool.h>
 		#include <string.h>
 
