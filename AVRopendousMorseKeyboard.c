@@ -75,25 +75,25 @@ uint8_t   IdleCount           = 0;
 uint16_t  IdleMSRemaining     = 0;
 
 /* Morse Keyboard related: */
-uint8_t temp = 0;
-uint16_t timer1Value = 0;
-uint16_t timer1OverflowCount = 0;
-uint8_t firstEdge = 1;
-uint8_t havePulse = 0;
-uint16_t timer1Val1 = 0;
-uint16_t timer1Val2 = 0;
-uint16_t timer1pulselength = 0;
+bool overflow = false;
+bool overflow_toomuch = false;
+volatile uint8_t temp = 0;
+volatile uint16_t timer1Value = 0;
+volatile uint16_t timer1OverflowCount = 0;
+volatile uint8_t firstEdge = 1;
+volatile uint8_t havePulse = 0;
+volatile uint16_t timer1Val1 = 0;
+volatile uint16_t timer1Val2 = 0;
+volatile uint16_t timer1pulselength = 0;
 
-uint8_t prevch = 0;
-uint16_t timer2pulselength = 0;
+volatile uint8_t prevch = 0;
+volatile uint16_t timer2pulselength = 0;
 
 char string_1[] PROGMEM = "this is the magic string that shows how progmem works;";
 
 
 
 RingBuff_t print_buffer;
-RingBuff_t code_buffer;
-RingBuff_t time_buffer;
 
 
 int main(void)
@@ -133,8 +133,6 @@ int main(void)
 
 	/* Ringbuffer Initialization */
 	Buffer_Initialize(&print_buffer);
-	Buffer_Initialize(&code_buffer);
-	Buffer_Initialize(&time_buffer);
 
 	/* Initialize USB Subsystem */
 	USB_Init();
@@ -320,24 +318,26 @@ void USBputs(char msg[])
     int i = 0;
     while (msg[i] != 0) {
         if (prevch == (uint8_t)msg[i]) {
-			Buffer_StoreElement(&print_buffer, (uint8_t)0);
+			Buffer_StoreElement(&print_buffer, 0);
             prevch = 0;
             continue;
         }
 		if (((uint8_t)msg[i] <= 122) && ((uint8_t)msg[i] >= 97)) // a- z
-			Buffer_StoreElement(&print_buffer, (uint8_t)msg[i] - 93);
+			Buffer_StoreElement(&print_buffer, (uint16_t)msg[i] - 93);
 		else if (((uint8_t)msg[i] <= 90) && ((uint8_t)msg[i] >= 65)) { // A -Z
-			Buffer_StoreElement(&print_buffer, (uint8_t)msg[i] - 61);
+            uint16_t t = (1 << 5) << 8;
+            t |= msg[i]-61;
+			Buffer_StoreElement(&print_buffer, (uint16_t)t);
 			//.Modifier = (1 << 5);
 		}
 		else if (((uint8_t)msg[i] <= 57) && ((uint8_t)msg[i] >= 49)) // 1 - 9
-			Buffer_StoreElement(&print_buffer, (uint8_t)msg[i] - 19);
+			Buffer_StoreElement(&print_buffer, (uint16_t)msg[i] - 19);
 		else if ((uint8_t)msg[i] == 48) // 0
-			Buffer_StoreElement(&print_buffer, (uint8_t)39);
+			Buffer_StoreElement(&print_buffer, (uint16_t)39);
 		else if ((uint8_t)msg[i] == 32)
-			Buffer_StoreElement(&print_buffer, (uint8_t)44); //space
+			Buffer_StoreElement(&print_buffer, (uint16_t)44); //space
 		else if ((uint8_t)msg[i] == 59)
-			Buffer_StoreElement(&print_buffer, (uint8_t)40); //enter
+			Buffer_StoreElement(&print_buffer, (uint16_t)40); //enter
         prevch = (uint8_t)msg[i];
         i++;
 
@@ -426,6 +426,7 @@ void USBputs_i16(uint16_t i)
     USBputs_i(l);
 }
 
+// ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 
 
 bool GetNextReport(USB_KeyboardReport_Data_t* ReportData)
@@ -438,37 +439,31 @@ bool GetNextReport(USB_KeyboardReport_Data_t* ReportData)
 	ReportData->KeyCode[0] = 0x00;
 
     if (print_buffer.Elements) {
-        ReportData->KeyCode[0] = (uint8_t)Buffer_GetElement(&print_buffer);
+        uint16_t t = Buffer_GetElement(&print_buffer);
+        ReportData->Modifier = (t & 0xff00) >> 8;
+        ReportData->KeyCode[0] = t & 0x00ff;
     } else {
 
         /* TODO: process pulse lengths into characters */
         if (havePulse) { // only run this if we have a full pulse
             // if Timer1 has overflowed, make sure to do the right subtraction
-            if (timer1Val2 > timer1Val1) { // Why is this here?  Can't you just check timer1pulselength
-                timer1pulselength = timer1Val2 - timer1Val1;
-            } else {
-                timer1pulselength = timer1Val1 - timer1Val2;
-            }
-
             if (timer1pulselength > 3000) {
                 ReportData->KeyCode[0] =  0x04; //a
-                USBputs(";");
-                USBputs_i16(timer1pulselength);
-                USBputs(";");
-                USBputs_i16(timer2pulselength);
-                USBputs(";");
-                USBputs_i16(timer1OverflowCount);
-                USBputs(";");
             } else {
                 ReportData->KeyCode[0] =  0x05; //b
-                USBputs(";");
-                USBputs_i16(timer1pulselength);
-                USBputs(";");
-                USBputs_i16(timer2pulselength);
-                USBputs(";");
-                USBputs_i16(timer1OverflowCount);
-                USBputs(";");
+        
             }
+            USBputs(";");
+            USBputs_i16(timer1Val1);
+            USBputs(";");
+            USBputs_i16(timer1Val2);
+            USBputs(";");
+            USBputs_i16(timer1pulselength);
+            USBputs(";");
+            USBputs_i16(timer2pulselength);
+            USBputs(";");
+            USBputs_i16(timer1OverflowCount);
+            USBputs(";");
 
             havePulse = 0;
         }
@@ -477,9 +472,7 @@ bool GetNextReport(USB_KeyboardReport_Data_t* ReportData)
 
         /* keep keyboard code to aid testing */
             if (~PIND & (1 << PIND0)) {
-            Buffer_StoreElement(&print_buffer, 0x1E); 
-            Buffer_StoreElement(&print_buffer, 0x1F); 
-            Buffer_StoreElement(&print_buffer, 0x20); 
+            Buffer_StoreElement(&print_buffer, 0x001F); 
         } else if (~PIND & (1 << PIND1)) {
             
             ReportData->KeyCode[0] = 0x05; //b
@@ -538,6 +531,13 @@ ISR(INT7_vect)
 	// process actual character assignment elsewhere to keep this ISR short
 
 	timer1Value = TCNT1;
+    if (timer1OverflowCount > 0) {
+        overflow = true;
+        if (timer1OverflowCount > 1) {
+            overflow_toomuch = true;
+        } 
+        timer1OverflowCount = 0;
+    }
 
 	// note that since HWB is pulled up, we need only worry about how long a LOW level lasts
 	if (~PIND & (1 << PIND7)) { // LOW level edge - falling edge - KEYDOWN
@@ -546,10 +546,20 @@ ISR(INT7_vect)
 		firstEdge = 0;
 
 		if (timer1Val2 > timer1Val1) {
+            // overflow
 			timer2pulselength = timer1Val2 - timer1Val1;
+            if ((overflow) && !(overflow_toomuch)) {
+                timer2pulselength = 0xFFFF - timer2pulselength;
+            } else {
+                timer2pulselength = 0xFFFF;
+            }
 		} else {
-			timer2pulselength = timer1Val1 - timer1Val2;
+            timer2pulselength = timer1Val1 - timer1Val2;
+            if (overflow) {
+                timer2pulselength = 0xFFFF;
+            }
 		}
+ 
 	} else if (PIND & (1 << PIND7)) { // HIGH level edge - rising edge - KEYUP
 		timer1Val2 = timer1Value;
 
@@ -557,8 +567,17 @@ ISR(INT7_vect)
 		// if Timer1 has overflowed, make sure to do the right subtraction
 		if (timer1Val2 > timer1Val1) {
 			timer1pulselength = timer1Val2 - timer1Val1;
+            if (overflow) {
+                timer1pulselength = 0xFFFF;
+            }
 		} else {
-			timer1pulselength = timer1Val1 - timer1Val2;
+            // overflow
+            timer1pulselength = timer1Val1 - timer1Val2;
+            if ((overflow) && !(overflow_toomuch)) {
+                timer1pulselength = 0xFFFF - timer1pulselength;
+            } else {
+                timer1pulselength = 0xFFFF;
+            }
 		}
 
 		// button press was too short - it is noise, so undo above
@@ -570,6 +589,8 @@ ISR(INT7_vect)
 			havePulse = 1;
 		}
 	}
+    overflow = false;
+    overflow_toomuch = false;
 }
 
 

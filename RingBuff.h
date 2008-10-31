@@ -45,7 +45,7 @@
      //#define BUFF_NOEMPTYCHECK        // Uncomment to disable checking of empty ringbuffers - checking left to user!
 	
    /* Buffer storage type - set the datatype for the stored data */
-     #define BUFF_DATATYPE uint8_t    // Change to the data type that is going to be stored into the buffer
+     #define BUFF_DATATYPE uint16_t    // Change to the data type that is going to be stored into the buffer
 	
    /* Peek routine - uncomment to include the peek routine (fetches next byte without removing it from the buffer */
      //#define BUFF_USEPEEK
