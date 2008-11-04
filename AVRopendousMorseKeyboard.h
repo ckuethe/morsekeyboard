@@ -51,6 +51,7 @@
 		#include <libs/MyUSB/Version.h>			// Library Version Information
 		#include <libs/MyUSB/Common/ButtLoadTag.h>	// PROGMEM tags readable by the ButtLoad project
 		#include <libs/MyUSB/Drivers/USB/USB.h>		// USB Functionality
+        #include <libs/MyUSB/Scheduler/Scheduler.h>
 
 	/* Macros: */
 		#define REQ_GetReport      0x01
@@ -77,5 +78,7 @@
 	/* Function Prototypes: */
 		bool GetNextReport(USB_KeyboardReport_Data_t* ReportData);
 		void ProcessLEDReport(uint8_t LEDReport);
+
+   /* Task Definitions */
 
 #endif
