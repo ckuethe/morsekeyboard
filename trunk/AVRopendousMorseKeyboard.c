@@ -82,18 +82,26 @@ volatile uint16_t timer1Value = 0;
 volatile uint16_t timer1OverflowCount = 0;
 volatile uint8_t firstEdge = 1;
 volatile uint8_t havePulse = 0;
+
+volatile bool keyon = false;
+volatile bool keyoff = true;
 volatile uint16_t timer1Val1 = 0;
 volatile uint16_t timer1Val2 = 0;
-volatile uint16_t timer1pulselength = 0;
+volatile uint16_t timer_keyon = 0;
 
 volatile uint8_t prevch = 0;
-volatile uint16_t timer2pulselength = 0;
+volatile uint16_t timer_keyoff = 0;
 
 char string_1[] PROGMEM = "this is the magic string that shows how progmem works;";
 
-
+TASK(Decode);
+TASK_LIST 
+{
+    { Task: Decode, TaskStatus: TASK_RUN },
+};
 
 RingBuff_t print_buffer;
+RingBuff_t timing_buffer;
 
 
 int main(void)
@@ -133,16 +141,14 @@ int main(void)
 
 	/* Ringbuffer Initialization */
 	Buffer_Initialize(&print_buffer);
+	Buffer_Initialize(&timing_buffer);
 
 	/* Initialize USB Subsystem */
 	USB_Init();
-
-	/* Main program code loop */
-	for (;;)
-	{
-		/* No main code -- all USB code is interrupt driven */
-	}
+    Scheduler_Start();
 }
+
+
 
 EVENT_HANDLER(USB_Connect)
 {
@@ -426,6 +432,13 @@ void USBputs_i16(uint16_t i)
     USBputs_i(l);
 }
 
+TASK(Decode)
+{
+    if (timing_buffer.Elements) {
+        uint16_t tval = Buffer_GetElement(&timing_buffer);
+        USBputs_i16(tval); 
+    }
+}
 // ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 
 
@@ -447,23 +460,12 @@ bool GetNextReport(USB_KeyboardReport_Data_t* ReportData)
         /* TODO: process pulse lengths into characters */
         if (havePulse) { // only run this if we have a full pulse
             // if Timer1 has overflowed, make sure to do the right subtraction
-            if (timer1pulselength > 3000) {
+            if (timer_keyon > 3000) {
                 ReportData->KeyCode[0] =  0x04; //a
             } else {
                 ReportData->KeyCode[0] =  0x05; //b
         
             }
-            USBputs(";");
-            USBputs_i16(timer1Val1);
-            USBputs(";");
-            USBputs_i16(timer1Val2);
-            USBputs(";");
-            USBputs_i16(timer1pulselength);
-            USBputs(";");
-            USBputs_i16(timer2pulselength);
-            USBputs(";");
-            USBputs_i16(timer1OverflowCount);
-            USBputs(";");
 
             havePulse = 0;
         }
@@ -542,51 +544,57 @@ ISR(INT7_vect)
 	// note that since HWB is pulled up, we need only worry about how long a LOW level lasts
 	if (~PIND & (1 << PIND7)) { // LOW level edge - falling edge - KEYDOWN
         // also time the in between values
+        keyon = true;
+        keyoff = false;
 		timer1Val1 = timer1Value;
 		firstEdge = 0;
 
 		if (timer1Val2 > timer1Val1) {
             // overflow
-			timer2pulselength = timer1Val2 - timer1Val1;
+			timer_keyoff = timer1Val2 - timer1Val1;
             if ((overflow) && !(overflow_toomuch)) {
-                timer2pulselength = 0xFFFF - timer2pulselength;
+                timer_keyoff = 0xFFFF - timer_keyoff;
             } else {
-                timer2pulselength = 0xFFFF;
+                timer_keyoff = 0xFFFF;
             }
 		} else {
-            timer2pulselength = timer1Val1 - timer1Val2;
+            timer_keyoff = timer1Val1 - timer1Val2;
             if (overflow) {
-                timer2pulselength = 0xFFFF;
+                timer_keyoff = 0xFFFF;
             }
 		}
  
 	} else if (PIND & (1 << PIND7)) { // HIGH level edge - rising edge - KEYUP
+        keyon = false;
+        keyoff = true;
 		timer1Val2 = timer1Value;
 
 		// debounce key press (i.e, discard it if it is too short)
 		// if Timer1 has overflowed, make sure to do the right subtraction
 		if (timer1Val2 > timer1Val1) {
-			timer1pulselength = timer1Val2 - timer1Val1;
+			timer_keyon = timer1Val2 - timer1Val1;
             if (overflow) {
-                timer1pulselength = 0xFFFF;
+                timer_keyon = 0xFFFF;
             }
 		} else {
             // overflow
-            timer1pulselength = timer1Val1 - timer1Val2;
+            timer_keyon = timer1Val1 - timer1Val2;
             if ((overflow) && !(overflow_toomuch)) {
-                timer1pulselength = 0xFFFF - timer1pulselength;
+                timer_keyon = 0xFFFF - timer_keyon;
             } else {
-                timer1pulselength = 0xFFFF;
+                timer_keyon = 0xFFFF;
             }
 		}
 
 		// button press was too short - it is noise, so undo above
-		if (timer1pulselength < 2) { // 7812 is 1 second, so 10 is ~0.0013s, or ~1.3ms, and 2 ~= 0.26ms
+		if (timer_keyon < 2) { // 7812 is 1 second, so 10 is ~0.0013s, or ~1.3ms, and 2 ~= 0.26ms
 			firstEdge = 0;
 			havePulse = 0;
 		} else { // button press was correct, have a pulse's second edge
 			firstEdge = 1;
 			havePulse = 1;
+            Buffer_StoreElement(&timing_buffer, timer_keyoff); 
+            Buffer_StoreElement(&timing_buffer, timer_keyon); 
 		}
 	}
     overflow = false;

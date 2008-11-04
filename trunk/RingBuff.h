@@ -30,7 +30,7 @@
 
 /* Buffer Configuration: */
    /* Buffer length - select static size of created ringbuffers: */
-	 #define BUFF_STATICSIZE 128      // Set to the static ringbuffer size for all ringbuffers (place size after define)
+	 #define BUFF_STATICSIZE 40      // Set to the static ringbuffer size for all ringbuffers (place size after define)
 
    /* Volatile mode - uncomment to make buffers volatile, for use in ISRs, etc: */
 	 #define BUFF_VOLATILE            // Uncomment to cause all ring buffers to become volatile (and atomic if multi-byte) in access
