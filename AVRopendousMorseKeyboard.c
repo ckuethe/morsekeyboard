@@ -92,16 +92,24 @@ volatile uint16_t timer_keyon = 0;
 volatile uint8_t prevch = 0;
 volatile uint16_t timer_keyoff = 0;
 
+volatile uint16_t dahlen = 0;
+volatile uint16_t ditlen = 0;
+volatile bool havech = 0;
+
 char string_1[] PROGMEM = "this is the magic string that shows how progmem works;";
 
 TASK(Decode);
+TASK(Print);
+
 TASK_LIST 
 {
-    { Task: Decode, TaskStatus: TASK_RUN },
+    { Task: Decode, TaskStatus: TASK_RUN, GroupID:1 },
+    { Task: Print, TaskStatus: TASK_RUN, GroupID:1 },
 };
 
 RingBuff_t print_buffer;
 RingBuff_t timing_buffer;
+RingBuff_t cw_buffer;
 
 
 int main(void)
@@ -142,7 +150,9 @@ int main(void)
 	/* Ringbuffer Initialization */
 	Buffer_Initialize(&print_buffer);
 	Buffer_Initialize(&timing_buffer);
+	Buffer_Initialize(&cw_buffer);
 
+    Scheduler_Init();
 	/* Initialize USB Subsystem */
 	USB_Init();
     Scheduler_Start();
@@ -432,15 +442,58 @@ void USBputs_i16(uint16_t i)
     USBputs_i(l);
 }
 
+#define EQ(a, b) ( ((a-b) < 100) && ((a-b) > -100) ) ? true : false
+#define _d 1
+#define _h 2
+#define _D 3
+#define _H 4
+#define _L 5
+
 TASK(Decode)
 {
-    if (timing_buffer.Elements) {
-        uint16_t tval = Buffer_GetElement(&timing_buffer);
-        USBputs_i16(tval); 
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    {
+        if (ditlen == 0) {
+            uint16_t tval = 0;
+            uint16_t tval2 = 0;
+            if (timing_buffer.Elements >= 7) {   //use v ...- for calibration
+                tval  = Buffer_GetElement(&timing_buffer); // keyoff len
+                tval  = Buffer_GetElement(&timing_buffer); // keyon len first dit
+                tval2 = Buffer_GetElement(&timing_buffer); // discard the rest
+                tval2 = Buffer_GetElement(&timing_buffer);
+                tval2 = Buffer_GetElement(&timing_buffer);
+                tval2 = Buffer_GetElement(&timing_buffer);
+                tval2 = Buffer_GetElement(&timing_buffer);
+                tval2 = Buffer_GetElement(&timing_buffer);
+                ditlen = tval;
+                dahlen = tval * 3;
+                USBputs("OK");
+                USBputs(";");
+            }
+        } else {
+            while (timing_buffer.Elements) {
+                uint16_t tval = Buffer_GetElement(&timing_buffer);
+                USBputs(";"); 
+                USBputs_i16(tval); 
+            }
+        }
     }
 }
 // ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 
+TASK(Print) 
+{
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    {
+        if (havech) {
+            char cwch[10] = {0};
+            while (cw_buffer.Elements) {
+                uint16_t tval = Buffer_GetElement(&cw_buffer);
+            }
+        }
+
+    } 
+}
 
 bool GetNextReport(USB_KeyboardReport_Data_t* ReportData)
 {
@@ -460,13 +513,6 @@ bool GetNextReport(USB_KeyboardReport_Data_t* ReportData)
         /* TODO: process pulse lengths into characters */
         if (havePulse) { // only run this if we have a full pulse
             // if Timer1 has overflowed, make sure to do the right subtraction
-            if (timer_keyon > 3000) {
-                ReportData->KeyCode[0] =  0x04; //a
-            } else {
-                ReportData->KeyCode[0] =  0x05; //b
-        
-            }
-
             havePulse = 0;
         }
 
