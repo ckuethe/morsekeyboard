@@ -85,6 +85,7 @@ SRC = $(TARGET).c                                           \
 	  Descriptors.c                                         \
 	  RingBuff.c                                         \
 	  ../../libs/MyUSB/Drivers/USB/LowLevel/LowLevel.c           \
+	  ../../libs/MyUSB/Scheduler/Scheduler.c           \
 	  ../../libs/MyUSB/Drivers/USB/LowLevel/Endpoint.c           \
 	  ../../libs/MyUSB/Drivers/USB/LowLevel/DevChapter9.c        \
 	  ../../libs/MyUSB/Drivers/USB/HighLevel/USBTask.c           \
