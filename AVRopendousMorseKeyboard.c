@@ -62,6 +62,7 @@
 
 #include "AVRopendousMorseKeyboard.h"
 #include "RingBuff.h"
+#include "cw_code.h"
 
 /* Project Tags, for reading out using the ButtLoad project */
 BUTTLOADTAG(ProjName,     "MyUSB AVRopendous Keyboard App");
@@ -90,10 +91,12 @@ volatile uint16_t timer1Val2 = 0;
 volatile uint16_t timer_keyon = 0;
 
 volatile uint8_t prevch = 0;
+volatile uint8_t prevch16 = 0;
 volatile uint16_t timer_keyoff = 0;
 
 volatile uint16_t dahlen = 0;
 volatile uint16_t ditlen = 0;
+volatile uint16_t ptr = 0;
 volatile bool havech = 0;
 
 char string_1[] PROGMEM = "this is the magic string that shows how progmem works;";
@@ -329,6 +332,14 @@ ISR(TIMER0_COMPA_vect, ISR_BLOCK)
 	  IdleMSRemaining--;
 }
 
+void USBputch(uint16_t v) {
+    if (prevch16 == v) {
+        Buffer_StoreElement(&print_buffer, 0);
+    }
+    Buffer_StoreElement(&print_buffer, v);
+    prevch16 = v;
+}
+
 void USBputs(char msg[]) 
 {
     int i = 0;
@@ -420,7 +431,7 @@ char itohexa(uint8_t i) {
     return res;
 }
 
-void USBputs_i(uint8_t i) 
+void USBputi(uint8_t i) 
 {
     uint8_t u = (i & 0xf0) >> 4;
     uint8_t l = (i & 0x0f);
@@ -434,20 +445,20 @@ void USBputs_i(uint8_t i)
     USBputs(sl);
 }
 
-void USBputs_i16(uint16_t i) 
+void USBputi16(uint16_t i) 
 {
     uint8_t u = (i & 0xff00) >> 8;     
     uint8_t l = (i & 0x00ff); 
-    USBputs_i(u);
-    USBputs_i(l);
+    USBputi(u);
+    USBputi(l);
 }
 
-#define EQ(a, b) ( ((a-b) < 100) && ((a-b) > -100) ) ? true : false
-#define _d 1
-#define _h 2
-#define _D 3
-#define _H 4
-#define _L 5
+#define ABS(a) (a < 0) ? -a : a 
+#define THRESH 2000
+#define EQ(a, b) (ABS(a - b) < THRESH) ? true : false
+#define _dit 1
+#define _dah 2
+#define _H 3
 
 TASK(Decode)
 {
@@ -467,17 +478,38 @@ TASK(Decode)
                 tval2 = Buffer_GetElement(&timing_buffer);
                 ditlen = tval;
                 dahlen = tval * 3;
+			    Buffer_StoreElement(&cw_buffer, _dah); 
+			    Buffer_StoreElement(&cw_buffer, _H); 
                 USBputs("OK");
                 USBputs(";");
+                USBputi16(ditlen);
+                USBputs(";");
+                USBputi16(dahlen);
+
             }
         } else {
             while (timing_buffer.Elements) {
-                uint16_t tval = Buffer_GetElement(&timing_buffer);
-                USBputs(";"); 
-                USBputs_i16(tval); 
+                uint16_t pause = Buffer_GetElement(&timing_buffer); 
+                uint16_t pulse = Buffer_GetElement(&timing_buffer); 
+        
+           
+                
+                if ((pause > dahlen) || (EQ(pause, dahlen))) {
+			        Buffer_StoreElement(&cw_buffer, _H); 
+                }
+                
+                if (ABS(pulse - ditlen) < THRESH) {
+			        Buffer_StoreElement(&cw_buffer, _dit); 
+                } else if (EQ(pulse, dahlen)) {
+			        Buffer_StoreElement(&cw_buffer, _dah); 
+                } else {
+                    
+                }
+                
             }
+               
         }
-    }
+    } // end ATOMIC
 }
 // ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 
@@ -485,14 +517,34 @@ TASK(Print)
 {
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
     {
-        if (havech) {
-            char cwch[10] = {0};
-            while (cw_buffer.Elements) {
-                uint16_t tval = Buffer_GetElement(&cw_buffer);
+         uint16_t tval = TCNT1;
+         firstEdge = 0;
+
+        if (timer1Val2 > tval) {
+            // overflow
+            timer_keyoff = timer1Val2 - tval;
+            if ((overflow) && !(overflow_toomuch)) {
+                timer_keyoff = 0xFFFF - timer_keyoff;
+            } else {
+                timer_keyoff = 0xFFFF;
             }
+        } else {
+            timer_keyoff = tval - timer1Val2;
+            if (overflow) {
+                timer_keyoff = 0xFFFF;
+            }
+        }                     
+        tval = Buffer_GetElement(&cw_buffer);
+        if (tval == _dit) { //lookup char in binary tree
+            ptr = ptr*2 + 1; // left child
+        } else if (tval == _dah) {
+            ptr = ptr*2 + 2; // right child
+        } else if ((tval == _H) || (timer_keyoff > dahlen)) {
+            USBputch(pgm_read_word(&cw_table[ptr]));
+            ptr = 0;
         }
 
-    } 
+    }  //end ATOMIC
 }
 
 bool GetNextReport(USB_KeyboardReport_Data_t* ReportData)
@@ -518,53 +570,7 @@ bool GetNextReport(USB_KeyboardReport_Data_t* ReportData)
 
 
 
-        /* keep keyboard code to aid testing */
-            if (~PIND & (1 << PIND0)) {
-            Buffer_StoreElement(&print_buffer, 0x001F); 
-        } else if (~PIND & (1 << PIND1)) {
-            
-            ReportData->KeyCode[0] = 0x05; //b
-        } else if (~PIND & (1 << PIND2)) {
-            ReportData->KeyCode[0] = 0x06; //c
-        } else if (~PIND & (1 << PIND3)) {
-            ReportData->KeyCode[0] = 0x07; //d
-        } else if (~PIND & (1 << PIND4)) {
-            ReportData->KeyCode[0] = 0x08; //e
-        } else if (~PIND & (1 << PIND5)) {
-            ReportData->KeyCode[0] = 0x09; //f
-        } else if (~PIND & (1 << PIND6)) {
-            ReportData->KeyCode[0] = 0x0A; //g
-        /* do not deal with H as it is Keyer input */
-
-        } else if (~PINB & (1 << PINB0)) {
-            ReportData->KeyCode[0] = 0x0C; //i
-        } else if (~PINB & (1 << PINB1)) {
-            ReportData->KeyCode[0] = 0x0D; //j
-        } else if (~PINB & (1 << PINB2)) {
-            ReportData->KeyCode[0] = 0x0E; //k
-        } else if (~PINB & (1 << PINB3)) {
-            ReportData->KeyCode[0] = 0x0F; //l
-        } else if (~PINB & (1 << PINB4)) {
-            ReportData->KeyCode[0] = 0x10; //m
-        } else if (~PINB & (1 << PINB5)) {
-            ReportData->KeyCode[0] = 0x11; //n
-        } else if (~PINB & (1 << PINB6)) {
-            ReportData->KeyCode[0] = 0x12; //o
-        } else if (~PINB & (1 << PINB7)) {
-            ReportData->KeyCode[0] = 0x13; //p
-
-        } else if (~PINC & (1 << PINC2)) {
-            ReportData->KeyCode[0] = 0x18; //u
-        } else if (~PINC & (1 << PINC4)) {
-            ReportData->KeyCode[0] = 0x17; //t
-        } else if (~PINC & (1 << PINC5)) {
-            ReportData->KeyCode[0] = 0x16; //s
-        } else if (~PINC & (1 << PINC6)) {
-            ReportData->KeyCode[0] = 0x15; //r
-        } else if (~PINC & (1 << PINC7)) {
-            ReportData->KeyCode[0] = 0x14; //q
-        }
-
+    
      }
 	/* Return whether the new report is different to the previous report or not */
 	return InputChanged;

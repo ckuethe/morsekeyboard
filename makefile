@@ -84,6 +84,7 @@ OBJDIR = .
 SRC = $(TARGET).c                                           \
 	  Descriptors.c                                         \
 	  RingBuff.c                                         \
+	  cw_code.c                                         \
 	  ../../libs/MyUSB/Drivers/USB/LowLevel/LowLevel.c           \
 	  ../../libs/MyUSB/Scheduler/Scheduler.c           \
 	  ../../libs/MyUSB/Drivers/USB/LowLevel/Endpoint.c           \
