@@ -76,42 +76,42 @@ uint8_t   IdleCount           = 0;
 uint16_t  IdleMSRemaining     = 0;
 
 /* Morse Keyboard related: */
-bool overflow = false;
-bool overflow_toomuch = false;
-volatile uint8_t temp = 0;
+volatile bool overflow = false;
+volatile bool overflow_toomuch = false;
+volatile bool pausing = false;
+volatile bool queuedH = false;
+
 volatile uint16_t timer1Value = 0;
 volatile uint16_t timer1OverflowCount = 0;
-volatile uint8_t firstEdge = 1;
-volatile uint8_t havePulse = 0;
 
-volatile bool keyon = false;
-volatile bool keyoff = true;
 volatile uint16_t timer1Val1 = 0;
 volatile uint16_t timer1Val2 = 0;
 volatile uint16_t timer_keyon = 0;
+volatile uint16_t timer_keyoff = 0;
 
 volatile uint8_t prevch = 0;
 volatile uint8_t prevch16 = 0;
-volatile uint16_t timer_keyoff = 0;
 
 volatile uint16_t dahlen = 0;
 volatile uint16_t ditlen = 0;
 volatile uint16_t ptr = 0;
-volatile bool havech = 0;
 
-char string_1[] PROGMEM = "this is the magic string that shows how progmem works;";
+#define DEBUG 0
 
-TASK(Decode);
+#define THRESH 100 
+#define _dit 1
+#define _dah 2
+#define _H 3
+
+
 TASK(Print);
 
 TASK_LIST 
 {
-    { Task: Decode, TaskStatus: TASK_RUN, GroupID:1 },
     { Task: Print, TaskStatus: TASK_RUN, GroupID:1 },
 };
 
 RingBuff_t print_buffer;
-RingBuff_t timing_buffer;
 RingBuff_t cw_buffer;
 
 
@@ -152,7 +152,6 @@ int main(void)
 
 	/* Ringbuffer Initialization */
 	Buffer_Initialize(&print_buffer);
-	Buffer_Initialize(&timing_buffer);
 	Buffer_Initialize(&cw_buffer);
 
     Scheduler_Init();
@@ -359,6 +358,12 @@ void USBputs(char msg[])
 		}
 		else if (((uint8_t)msg[i] <= 57) && ((uint8_t)msg[i] >= 49)) // 1 - 9
 			Buffer_StoreElement(&print_buffer, (uint16_t)msg[i] - 19);
+        else if ((uint8_t)msg[i] == 124) 
+            Buffer_StoreElement(&print_buffer, (uint16_t)(SHFT | BSLASH)); // |
+        else if ((uint8_t)msg[i] == 45)
+            Buffer_StoreElement(&print_buffer, (uint16_t)DASH); // -
+        else if ((uint8_t)msg[i] == 46)
+            Buffer_StoreElement(&print_buffer, (uint16_t)PERIOD); // .
 		else if ((uint8_t)msg[i] == 48) // 0
 			Buffer_StoreElement(&print_buffer, (uint16_t)39);
 		else if ((uint8_t)msg[i] == 32)
@@ -453,97 +458,89 @@ void USBputi16(uint16_t i)
     USBputi(l);
 }
 
-#define ABS(a) (a < 0) ? -a : a 
-#define THRESH 2000
-#define EQ(a, b) (ABS(a - b) < THRESH) ? true : false
-#define _dit 1
-#define _dah 2
-#define _H 3
-
-TASK(Decode)
+bool EQ(uint16_t a, uint16_t b)
 {
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    {
-        if (ditlen == 0) {
-            uint16_t tval = 0;
-            uint16_t tval2 = 0;
-            if (timing_buffer.Elements >= 7) {   //use v ...- for calibration
-                tval  = Buffer_GetElement(&timing_buffer); // keyoff len
-                tval  = Buffer_GetElement(&timing_buffer); // keyon len first dit
-                tval2 = Buffer_GetElement(&timing_buffer); // discard the rest
-                tval2 = Buffer_GetElement(&timing_buffer);
-                tval2 = Buffer_GetElement(&timing_buffer);
-                tval2 = Buffer_GetElement(&timing_buffer);
-                tval2 = Buffer_GetElement(&timing_buffer);
-                tval2 = Buffer_GetElement(&timing_buffer);
-                ditlen = tval;
-                dahlen = tval * 3;
-			    Buffer_StoreElement(&cw_buffer, _dah); 
-			    Buffer_StoreElement(&cw_buffer, _H); 
-                USBputs("OK");
-                USBputs(";");
-                USBputi16(ditlen);
-                USBputs(";");
-                USBputi16(dahlen);
-
-            }
-        } else {
-            while (timing_buffer.Elements) {
-                uint16_t pause = Buffer_GetElement(&timing_buffer); 
-                uint16_t pulse = Buffer_GetElement(&timing_buffer); 
-        
-           
-                
-                if ((pause > dahlen) || (EQ(pause, dahlen))) {
-			        Buffer_StoreElement(&cw_buffer, _H); 
-                }
-                
-                if (ABS(pulse - ditlen) < THRESH) {
-			        Buffer_StoreElement(&cw_buffer, _dit); 
-                } else if (EQ(pulse, dahlen)) {
-			        Buffer_StoreElement(&cw_buffer, _dah); 
-                } else {
-                    
-                }
-                
-            }
-               
-        }
-    } // end ATOMIC
+    uint16_t c = 0;
+    if (a < b)
+        c = b - a;
+    else
+       c = a - b;
+    return (c < THRESH);
 }
-// ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+
+uint16_t get_pauselen() 
+{
+    timer1Val1 = TCNT1; 
+    // for the pauselength timer
+    // timer1Val2 is the startting timestamp
+    // timer1Val1 is the ending timestamp 
+    if (timer1Val2 > timer1Val1) {
+        // overflow
+        timer_keyoff = timer1Val2 - timer1Val1;
+        if ((overflow) && !(overflow_toomuch)) {
+            timer_keyoff = 0xFFFF - timer_keyoff;
+        } else {
+            timer_keyoff = 0xFFFF;
+        }
+    } else {
+        timer_keyoff = timer1Val1 - timer1Val2;
+        if (overflow) {
+            timer_keyoff = 0xFFFF;
+        }
+    }
+    return timer_keyoff;
+}
+
+uint16_t get_pulselen()
+{
+    timer1Val2 = TCNT1; 
+    // for the pulselength timer
+    // timer1Val1 is the startting timestamp
+    // timer1Val2 is the ending timestamp 
+    if (timer1Val2 > timer1Val1) {
+        timer_keyon = timer1Val2 - timer1Val1;
+        if (overflow) {
+            timer_keyon = 0xFFFF;
+        }
+    } else {
+        // overflow
+        timer_keyon = timer1Val1 - timer1Val2;
+        if ((overflow) && !(overflow_toomuch)) {
+            timer_keyon = 0xFFFF - timer_keyon;
+        } else {
+            timer_keyon = 0xFFFF;
+        }
+    }
+    return timer_keyon;
+}
 
 TASK(Print) 
 {
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
     {
-         uint16_t tval = TCNT1;
-         firstEdge = 0;
-
-        if (timer1Val2 > tval) {
-            // overflow
-            timer_keyoff = timer1Val2 - tval;
-            if ((overflow) && !(overflow_toomuch)) {
-                timer_keyoff = 0xFFFF - timer_keyoff;
-            } else {
-                timer_keyoff = 0xFFFF;
+        if ((pausing) && !(queuedH)) {
+            uint16_t pauselen = get_pauselen();
+            if ((pauselen >= dahlen) || EQ(dahlen, pauselen)) {
+                Buffer_StoreElement(&cw_buffer, _H);
+                queuedH = true;
             }
-        } else {
-            timer_keyoff = tval - timer1Val2;
-            if (overflow) {
-                timer_keyoff = 0xFFFF;
+        } else if (cw_buffer.Elements) {
+            uint16_t tval = Buffer_GetElement(&cw_buffer);
+            //lookup char in binary tree
+            if (tval == _dit) { 
+                ptr = ptr*2 + 1; // left child
+            } else if (tval == _dah) {
+                ptr = ptr*2 + 2; // right child
+            } else if (tval == _H) {
+                uint16_t ch = pgm_read_word(&cw_table[ptr]);
+                // check ch for modifiers like CTRL SHFT ALT TODO
+                USBputch(ch);
+#if DEBUG >= 2
+                USBputs("|");
+#endif
+                ptr = 0;
             }
-        }                     
-        tval = Buffer_GetElement(&cw_buffer);
-        if (tval == _dit) { //lookup char in binary tree
-            ptr = ptr*2 + 1; // left child
-        } else if (tval == _dah) {
-            ptr = ptr*2 + 2; // right child
-        } else if ((tval == _H) || (timer_keyoff > dahlen)) {
-            USBputch(pgm_read_word(&cw_table[ptr]));
-            ptr = 0;
         }
-
     }  //end ATOMIC
 }
 
@@ -560,19 +557,8 @@ bool GetNextReport(USB_KeyboardReport_Data_t* ReportData)
         uint16_t t = Buffer_GetElement(&print_buffer);
         ReportData->Modifier = (t & 0xff00) >> 8;
         ReportData->KeyCode[0] = t & 0x00ff;
-    } else {
-
-        /* TODO: process pulse lengths into characters */
-        if (havePulse) { // only run this if we have a full pulse
-            // if Timer1 has overflowed, make sure to do the right subtraction
-            havePulse = 0;
-        }
-
-
-
-    
-     }
-	/* Return whether the new report is different to the previous report or not */
+    } 
+    /* Return whether the new report is different to the previous report or not */
 	return InputChanged;
 }
 
@@ -596,58 +582,69 @@ ISR(INT7_vect)
 	// note that since HWB is pulled up, we need only worry about how long a LOW level lasts
 	if (~PIND & (1 << PIND7)) { // LOW level edge - falling edge - KEYDOWN
         // also time the in between values
-        keyon = true;
-        keyoff = false;
-		timer1Val1 = timer1Value;
-		firstEdge = 0;
+        pausing = false;
+		timer1Val1 = timer1Value; // start keydown timer and start keyup timer
 
-		if (timer1Val2 > timer1Val1) {
-            // overflow
-			timer_keyoff = timer1Val2 - timer1Val1;
-            if ((overflow) && !(overflow_toomuch)) {
-                timer_keyoff = 0xFFFF - timer_keyoff;
-            } else {
-                timer_keyoff = 0xFFFF;
-            }
-		} else {
-            timer_keyoff = timer1Val1 - timer1Val2;
-            if (overflow) {
-                timer_keyoff = 0xFFFF;
-            }
-		}
+        uint16_t pauselen = get_pauselen();
+#if DEBUG >= 3
+        USBputs("off ");
+        USBputi16(pauselen);
+        USBputs(";");
+#endif
+
  
 	} else if (PIND & (1 << PIND7)) { // HIGH level edge - rising edge - KEYUP
-        keyon = false;
-        keyoff = true;
-		timer1Val2 = timer1Value;
+        pausing = true;
+		timer1Val2 = timer1Value; // start keyup timer and stop keydown timer
 
-		// debounce key press (i.e, discard it if it is too short)
-		// if Timer1 has overflowed, make sure to do the right subtraction
-		if (timer1Val2 > timer1Val1) {
-			timer_keyon = timer1Val2 - timer1Val1;
-            if (overflow) {
-                timer_keyon = 0xFFFF;
+        uint16_t pulselen = get_pulselen(); // get pulse length
+#if DEBUG >= 3
+        USBputs("on ");
+        USBputi16(pulselen);
+        USBputs(";");
+#endif
+
+        if (ditlen == 0) {  // initialize keyer with "ditdah*"
+            ditlen = pulselen;
+        } else if (dahlen == 0) {
+            dahlen = pulselen;
+#if DEBUG >= 2
+                USBputs("d ");
+                USBputi16(ditlen);
+                USBputs(";h ");
+                USBputi16(dahlen);
+                USBputs(";");
+#endif
+            if (EQ(ditlen, dahlen)) {
+                // error ditlen == dahlen
+                USBputs("E1");
+#if DEBUG >= 3
+                USBputs(";");
+#endif
             }
-		} else {
-            // overflow
-            timer_keyon = timer1Val1 - timer1Val2;
-            if ((overflow) && !(overflow_toomuch)) {
-                timer_keyon = 0xFFFF - timer_keyon;
+        } else {
+            if (EQ(ditlen, pulselen)) {
+                Buffer_StoreElement(&cw_buffer, _dit);
+#if DEBUG >= 2
+                USBputs(".");
+#endif
+                queuedH = false;
+            } else if (EQ(dahlen, pulselen)) {
+                Buffer_StoreElement(&cw_buffer, _dah);
+#if DEBUG >= 2
+                USBputs("-");
+#endif
+                queuedH = false;
             } else {
-                timer_keyon = 0xFFFF;
+                // error invalid timing
+                USBputs("E2");
+#if DEBUG >= 3
+                USBputs(";");
+#endif
             }
-		}
+            
+        }
 
-		// button press was too short - it is noise, so undo above
-		if (timer_keyon < 2) { // 7812 is 1 second, so 10 is ~0.0013s, or ~1.3ms, and 2 ~= 0.26ms
-			firstEdge = 0;
-			havePulse = 0;
-		} else { // button press was correct, have a pulse's second edge
-			firstEdge = 1;
-			havePulse = 1;
-            Buffer_StoreElement(&timing_buffer, timer_keyoff); 
-            Buffer_StoreElement(&timing_buffer, timer_keyon); 
-		}
 	}
     overflow = false;
     overflow_toomuch = false;
