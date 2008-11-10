@@ -97,7 +97,7 @@ volatile uint16_t dahlen = 0;
 volatile uint16_t ditlen = 0;
 volatile uint16_t ptr = 0;
 
-#define DEBUG 2
+#define DEBUG 0
 
 #define THRESH 100 
 #define _dit 1
@@ -542,7 +542,11 @@ TASK(Print)
                         USBputs("M");
 #endif
                     } else {
-                        ch |= modifier;
+                        if (ch == REPEAT) {
+                            ch = prevch16;
+                        } else {
+                            ch |= modifier;
+                        }
                         USBputch(ch);
 #if DEBUG >= 2
                         USBputs("|");
