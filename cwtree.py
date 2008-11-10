@@ -6,15 +6,28 @@ class N:
     l = 0
     r = 0
     depth = 0
+    usbcode = 0
 
 maxdepth = 0
 
-line = sys.stdin.readline()
+fh = open(sys.argv[1], 'r')
+
+line = fh.readline()
 S = N()
 while line:
+    print line
     C = S
     line = line.replace('\n', '')
-    val, cwch = line.split(' ')
+    if not line: 
+        line = fh.readline()
+        continue
+    if line[0] == '#': 
+        line = fh.readline()
+        continue
+    if not line.replace(' ', ''): 
+        line = fh.readline()
+        continue
+    val, cwch, usbcode = line.split(' ')
     print val
     print cwch
     if len(cwch) > maxdepth:
@@ -32,8 +45,10 @@ while line:
                 C.r.depth = C.depth + 1
             C = C.r
     C.val = val
-    line = sys.stdin.readline()
+    C.usbcode = usbcode
+    line = fh.readline()
 
+fh.close()
 
 def balancetree(node, depth):
     cdepth = 0
@@ -59,14 +74,17 @@ def inorder(node):
     if node.r != 0:
         inorder(node.r)
 
-def levelorder(root):
+def levelorder(root, lookup=None):
     q = []
     res = []
     q.append(root)
     i = 0
     while q:
         node = q.pop(0)
-        res.append(node.val)
+        if lookup:
+            res.append(lookup(node))
+        else:
+            res.append(node.val)
         i += 1
         if node.l:
             q.append(node.l)
@@ -74,6 +92,48 @@ def levelorder(root):
             q.append(node.r)
     return res
 
-print "maxdepth is %d" % maxdepth
-print (levelorder(balancetree(S, maxdepth)))
-print ','.join((levelorder(balancetree(S, maxdepth))))
+
+preamble_h = '''
+#ifndef _CWCODE_H_
+#define _CWCODE_H_
+
+/* Includes: */
+	#include <avr/io.h>
+	#include <avr/interrupt.h>
+	#include <util/atomic.h>
+	#include <limits.h>
+
+    #include <avr/pgmspace.h>
+	#include <MyUSB/Common/Common.h>
+'''
+
+postamble_h = '''
+extern uint16_t cw_table[] PROGMEM;
+
+#endif
+'''
+
+preamble_c = '''#include "cw_code.h"
+
+uint16_t cw_table[] PROGMEM = {'''
+
+
+postamble_c = '''};
+'''
+
+
+fh = open('cw_code.h', 'w')
+
+print >>fh, preamble_h
+for val, code in (levelorder(S, lambda a: [a.val, a.usbcode])):
+    if val and val != '0':
+        print >>fh,"#define %s %s" % (val, code)
+print >>fh,postamble_h
+fh.close()
+fh = open('cw_code.c', 'w')
+print >>fh,preamble_c
+print >>fh,','.join((levelorder(balancetree(S, maxdepth))))
+print >>fh,postamble_c
+fh.close()
+
+
