@@ -89,6 +89,7 @@ volatile uint16_t timer1Val2 = 0;
 volatile uint16_t timer_keyon = 0;
 volatile uint16_t timer_keyoff = 0;
 
+volatile uint16_t modifier = 0;
 volatile uint8_t prevch = 0;
 volatile uint8_t prevch16 = 0;
 
@@ -96,7 +97,7 @@ volatile uint16_t dahlen = 0;
 volatile uint16_t ditlen = 0;
 volatile uint16_t ptr = 0;
 
-#define DEBUG 0
+#define DEBUG 2
 
 #define THRESH 100 
 #define _dit 1
@@ -533,12 +534,25 @@ TASK(Print)
                 ptr = ptr*2 + 2; // right child
             } else if (tval == _H) {
                 uint16_t ch = pgm_read_word(&cw_table[ptr]);
-                // check ch for modifiers like CTRL SHFT ALT TODO
-                USBputch(ch);
+                // check ch for modifiers like CTRL SHFT ALT 
+                if (ch) {
+                    if ((0x00FF & ch) == 0x0000)  {
+                        modifier |= ch;  // add ch to modifier mask since it is a modifier
 #if DEBUG >= 2
-                USBputs("|");
+                        USBputs("M");
 #endif
-                ptr = 0;
+                    } else {
+                        ch |= modifier;
+                        USBputch(ch);
+#if DEBUG >= 2
+                        USBputs("|");
+#endif
+                        modifier = 0;
+                    }
+                    ptr = 0;
+
+
+                }
             }
         }
     }  //end ATOMIC
@@ -585,8 +599,8 @@ ISR(INT7_vect)
         pausing = false;
 		timer1Val1 = timer1Value; // start keydown timer and start keyup timer
 
-        uint16_t pauselen = get_pauselen();
 #if DEBUG >= 3
+        uint16_t pauselen = get_pauselen();
         USBputs("off ");
         USBputi16(pauselen);
         USBputs(";");

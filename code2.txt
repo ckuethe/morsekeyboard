@@ -1,6 +1,6 @@
 LA .-
 LB -...
-LC ---.
+LC -.-.
 LD -..
 LE .
 LF ..-.
@@ -38,8 +38,9 @@ BSLASH ----..
 FSLASH -..-.
 RSQUARE .--...
 LSQUARE -..---
-LT --..--
+LTH --..--
 GT ..--..
+ESC --....
 RPAREN ---...
 LPAREN ...---
 RCURLY --..-
@@ -53,7 +54,7 @@ DASH -....-
 APOS .----.
 SPACE ..--
 ENTER .-.-
-BSCAPE ----
+BSPACE ----
 SHFT --...-
 CTRL ---.
 ALT --.--
