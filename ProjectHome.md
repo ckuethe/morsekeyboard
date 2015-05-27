@@ -1,0 +1,1 @@
+This is the project for turning the [AVRopendous](http://avropendous.org/) into a cw or morse code keyboard.
